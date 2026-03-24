@@ -35,6 +35,8 @@ function build() {
     fs.cpSync(sourcePath, targetPath, { recursive: true });
   }
 
+  ensureGithubPagesStylesheetCompatibility();
+
   processDirectory(distDir);
 
   fs.writeFileSync(path.join(distDir, ".nojekyll"), "");
@@ -42,6 +44,15 @@ function build() {
   const cnameSourcePath = path.join(rootDir, "CNAME");
   if (fs.existsSync(cnameSourcePath)) {
     fs.copyFileSync(cnameSourcePath, path.join(distDir, "CNAME"));
+  }
+}
+
+function ensureGithubPagesStylesheetCompatibility() {
+  const customCmPath = path.join(distDir, "css", "custom.cm");
+  const customCssPath = path.join(distDir, "css", "custom.css");
+
+  if (fs.existsSync(customCmPath)) {
+    fs.copyFileSync(customCmPath, customCssPath);
   }
 }
 
@@ -77,6 +88,7 @@ function transformHtml(content, relativePath, relativePrefix) {
   content = stripOfficeAssets(content);
   content = stripVerificationMeta(content);
   content = stripAnalyticsAssets(content);
+  content = rewriteGithubPagesAssetExtensions(content);
   content = rewriteReferenceDomainUrls(content);
   content = rewriteHtmlAttribute(content, "href", relativePrefix);
   content = rewriteHtmlAttribute(content, "src", relativePrefix);
@@ -88,6 +100,10 @@ function transformHtml(content, relativePath, relativePrefix) {
   }
 
   return content;
+}
+
+function rewriteGithubPagesAssetExtensions(content) {
+  return content.replace(/(href=['"])(\/css\/custom)\.cm(\?[^'"]*)?(['"])/g, "$1$2.css$3$4");
 }
 
 function transformStyle(content, relativePrefix) {
