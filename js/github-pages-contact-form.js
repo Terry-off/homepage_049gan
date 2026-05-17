@@ -8,9 +8,14 @@
   var config = Object.assign(
     {
       endpoint: "https://formsubmit.co/ajax/hsptool@naver.com",
+      provider: "formsubmit",
       successMessage: "문의가 정상 접수되었습니다. 확인 후 연락드리겠습니다.",
       subjectPrefix: "[049GAN CONTACT]",
-      fallbackErrorMessage: "문의 전송 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+      fromName: "049GAN",
+      requestTimeoutMs: 15000,
+      fallbackErrorMessage: "문의 전송 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+      networkErrorMessage: "문의 전송 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      missingConfigMessage: "문의 전송 설정이 아직 완료되지 않았습니다. 관리자에게 문의해 주세요."
     },
     window.GITHUB_PAGES_CONTACT_FORM || {}
   );
@@ -140,6 +145,167 @@
     }
   }
 
+  function createUserError(message) {
+    var error = new Error(message);
+    error.userMessage = message;
+    return error;
+  }
+
+  function getProvider() {
+    return String(config.provider || "formsubmit").toLowerCase();
+  }
+
+  function appendCommonFormSubmitFields(payload, validation) {
+    payload.append("name", validation.name);
+    payload.append("phone", validation.phone);
+    payload.append("major", validation.major);
+    payload.append("privacy_agreed", "Y");
+    payload.append("page_url", window.location.href);
+    payload.append("_subject", (config.subjectPrefix + " " + validation.name).trim());
+    payload.append("_template", "table");
+    payload.append("_captcha", "false");
+    payload.append("_honey", "");
+  }
+
+  function appendWeb3FormsFields(payload, validation) {
+    var accessKey = config.accessKey || config.web3FormsAccessKey || "";
+    var endpointContainsKey = /\/submit\/[^/?#]+/i.test(String(config.endpoint || ""));
+
+    if (!accessKey && !endpointContainsKey) {
+      throw createUserError(config.missingConfigMessage);
+    }
+
+    if (accessKey) {
+      payload.append("access_key", accessKey);
+    }
+
+    payload.append("subject", (config.subjectPrefix + " " + validation.name).trim());
+    payload.append("from_name", config.fromName || "049GAN");
+    payload.append("name", validation.name);
+    payload.append("phone", validation.phone);
+    payload.append("major", validation.major);
+    payload.append("privacy_agreed", "Y");
+    payload.append("page_url", window.location.href);
+    payload.append(
+      "message",
+      [
+        "성함: " + validation.name,
+        "연락처: " + validation.phone,
+        "전공과목: " + validation.major,
+        "접수 페이지: " + window.location.href
+      ].join("\n")
+    );
+    payload.append("botcheck", "");
+  }
+
+  function buildRequest(validation) {
+    var endpoint = String(config.endpoint || "").trim();
+    if (!endpoint) {
+      throw createUserError(config.missingConfigMessage);
+    }
+
+    var provider = getProvider();
+    var payload = new FormData();
+
+    if (provider === "web3forms") {
+      appendWeb3FormsFields(payload, validation);
+    } else {
+      appendCommonFormSubmitFields(payload, validation);
+    }
+
+    return {
+      url: endpoint,
+      options: {
+        method: "POST",
+        headers: {
+          Accept: "application/json"
+        },
+        body: payload
+      }
+    };
+  }
+
+  async function fetchWithTimeout(url, options) {
+    var timeoutMs = Number(config.requestTimeoutMs || 0);
+    var controller = typeof AbortController === "function" ? new AbortController() : null;
+    var timeoutId = null;
+    var requestOptions = Object.assign({}, options);
+
+    if (controller) {
+      requestOptions.signal = controller.signal;
+    }
+
+    if (controller && timeoutMs > 0) {
+      timeoutId = window.setTimeout(function () {
+        controller.abort();
+      }, timeoutMs);
+    }
+
+    try {
+      return await fetch(url, requestOptions);
+    } finally {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    }
+  }
+
+  async function readResponse(response) {
+    var text = await response.text();
+    if (!text) {
+      return {};
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      return { message: text };
+    }
+  }
+
+  function getResultMessage(result) {
+    if (!result || typeof result !== "object") {
+      return "";
+    }
+
+    if (result.message) {
+      return result.message;
+    }
+
+    if (result.msg) {
+      return result.msg;
+    }
+
+    if (result.body && result.body.message) {
+      return result.body.message;
+    }
+
+    return "";
+  }
+
+  function isFailedResult(result) {
+    if (!result || typeof result !== "object") {
+      return false;
+    }
+
+    return result.success === false ||
+      result.success === "false" ||
+      result.status === "error" ||
+      result.error;
+  }
+
+  function getErrorMessage(error) {
+    if (error && error.userMessage) {
+      return error.userMessage;
+    }
+
+    if (error && (error.name === "AbortError" || error.message === "Failed to fetch")) {
+      return config.networkErrorMessage;
+    }
+
+    return error && error.message ? error.message : config.fallbackErrorMessage;
+  }
+
   async function submitForm() {
     var validation = validateForm();
     if (!validation.ok) {
@@ -154,39 +320,17 @@
     setBusyState(true);
 
     try {
-      var payload = new FormData();
-      payload.append("name", validation.name);
-      payload.append("phone", validation.phone);
-      payload.append("major", validation.major);
-      payload.append("privacy_agreed", "Y");
-      payload.append("page_url", window.location.href);
-      payload.append("_subject", (config.subjectPrefix + " " + validation.name).trim());
-      payload.append("_template", "table");
-      payload.append("_captcha", "false");
-      payload.append("_honey", "");
+      var request = buildRequest(validation);
+      var response = await fetchWithTimeout(request.url, request.options);
+      var result = await readResponse(response);
 
-      var response = await fetch(config.endpoint, {
-        method: "POST",
-        headers: {
-          Accept: "application/json"
-        },
-        body: payload
-      });
-
-      var result = {};
-      try {
-        result = await response.json();
-      } catch (error) {
-        result = {};
-      }
-
-      if (!response.ok || result.success === "false" || result.success === false) {
-        throw new Error(result.message || config.fallbackErrorMessage);
+      if (!response.ok || isFailedResult(result)) {
+        throw new Error(getResultMessage(result) || config.fallbackErrorMessage);
       }
 
       showSuccessModal(config.successMessage);
     } catch (error) {
-      showErrorModal(error && error.message ? error.message : config.fallbackErrorMessage);
+      showErrorModal(getErrorMessage(error));
     } finally {
       setBusyState(false);
     }

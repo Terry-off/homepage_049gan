@@ -1,6 +1,11 @@
 {
-  "formEndpoint": "https://formsubmit.co/ajax/hsptool@naver.com",
+  "formProvider": "web3forms",
+  "formEndpoint": "https://api.web3forms.com/submit",
+  "accessKey": "69131011-0363-457c-82d0-b0474a644859",
   "successMessage": "문의가 정상 접수되었습니다. 확인 후 연락드리겠습니다.",
   "subjectPrefix": "[049GAN CONTACT]",
-  "siteUrl": "https://049gan.kr"
+  "requestTimeoutMs": 15000,
+  "networkErrorMessage": "문의 전송 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  "fallbackErrorMessage": "문의 전송 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+  "siteUrl": "http://049gan.kr"
 }

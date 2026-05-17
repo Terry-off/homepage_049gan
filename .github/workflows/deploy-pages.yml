@@ -35,6 +35,14 @@ jobs:
         run: npm ci
 
       - name: Build static artifact
+        env:
+          PAGES_FORM_PROVIDER: ${{ vars.PAGES_FORM_PROVIDER }}
+          PAGES_FORM_ENDPOINT: ${{ vars.PAGES_FORM_ENDPOINT }}
+          PAGES_FORM_FROM_NAME: ${{ vars.PAGES_FORM_FROM_NAME }}
+          PAGES_FORM_SUBJECT_PREFIX: ${{ vars.PAGES_FORM_SUBJECT_PREFIX }}
+          PAGES_FORM_SUCCESS_MESSAGE: ${{ vars.PAGES_FORM_SUCCESS_MESSAGE }}
+          PAGES_FORM_ACCESS_KEY: ${{ secrets.PAGES_FORM_ACCESS_KEY }}
+          WEB3FORMS_ACCESS_KEY: ${{ secrets.WEB3FORMS_ACCESS_KEY }}
         run: npm run build:pages
 
       - name: Upload Pages artifact

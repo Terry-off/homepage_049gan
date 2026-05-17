@@ -19,9 +19,28 @@ const includeEntries = [
 
 const pagesConfig = readPagesConfig();
 const siteUrl = resolveSiteUrl();
-const formEndpoint = pagesConfig.formEndpoint || "https://formsubmit.co/ajax/hsptool@naver.com";
-const successMessage = pagesConfig.successMessage || "문의가 정상 접수되었습니다. 확인 후 연락드리겠습니다.";
-const subjectPrefix = pagesConfig.subjectPrefix || "[049GAN CONTACT]";
+const formEndpoint =
+  process.env.PAGES_FORM_ENDPOINT ||
+  pagesConfig.formEndpoint ||
+  "https://formsubmit.co/ajax/hsptool@naver.com";
+const formProvider =
+  process.env.PAGES_FORM_PROVIDER ||
+  pagesConfig.formProvider ||
+  inferFormProvider(formEndpoint);
+const successMessage =
+  process.env.PAGES_FORM_SUCCESS_MESSAGE ||
+  pagesConfig.successMessage ||
+  "문의가 정상 접수되었습니다. 확인 후 연락드리겠습니다.";
+const subjectPrefix =
+  process.env.PAGES_FORM_SUBJECT_PREFIX ||
+  pagesConfig.subjectPrefix ||
+  "[049GAN CONTACT]";
+const formAccessKey =
+  process.env.WEB3FORMS_ACCESS_KEY ||
+  process.env.PAGES_FORM_ACCESS_KEY ||
+  pagesConfig.accessKey ||
+  pagesConfig.web3FormsAccessKey ||
+  "";
 
 build();
 
@@ -172,13 +191,28 @@ function absoluteUrlForPath(rawPathname) {
 }
 
 function injectContactBridge(content, relativePrefix) {
+  const contactFormConfig = {
+    endpoint: formEndpoint,
+    provider: formProvider,
+    successMessage,
+    subjectPrefix,
+    fromName: process.env.PAGES_FORM_FROM_NAME || pagesConfig.fromName || "049GAN",
+    accessKey: formAccessKey,
+    requestTimeoutMs: Number(process.env.PAGES_FORM_TIMEOUT_MS || pagesConfig.requestTimeoutMs || 15000),
+    fallbackErrorMessage:
+      pagesConfig.fallbackErrorMessage ||
+      "문의 전송 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+    networkErrorMessage:
+      pagesConfig.networkErrorMessage ||
+      "문의 전송 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    missingConfigMessage:
+      pagesConfig.missingConfigMessage ||
+      "문의 전송 설정이 아직 완료되지 않았습니다. 관리자에게 문의해 주세요."
+  };
+
   const configScript = [
     "<script>",
-    "window.GITHUB_PAGES_CONTACT_FORM = {",
-    '  endpoint: ' + JSON.stringify(formEndpoint) + ",",
-    '  successMessage: ' + JSON.stringify(successMessage) + ",",
-    '  subjectPrefix: ' + JSON.stringify(subjectPrefix),
-    "};",
+    "window.GITHUB_PAGES_CONTACT_FORM = " + JSON.stringify(contactFormConfig, null, 2) + ";",
     "</script>",
     '<script src="' + relativePrefix + 'js/github-pages-contact-form.js"></script>'
   ].join("\n");
@@ -226,6 +260,14 @@ function resolveSiteUrl() {
   const configured = (pagesConfig.siteUrl || process.env.PAGES_SITE_URL || deriveGithubPagesSiteUrl()).trim();
   const candidate = configured || "https://example.com/";
   return candidate.endsWith("/") ? candidate : candidate + "/";
+}
+
+function inferFormProvider(endpoint) {
+  if (/web3forms\.com/i.test(endpoint || "")) {
+    return "web3forms";
+  }
+
+  return "formsubmit";
 }
 
 function deriveGithubPagesSiteUrl() {

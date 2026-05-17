@@ -71,12 +71,37 @@ GitHub Pages는 정적 호스팅만 가능하므로, GitHub Pages 배포물의 `
 
 ```json
 {
+  "formProvider": "formsubmit",
   "formEndpoint": "https://formsubmit.co/ajax/hsptool@naver.com",
   "successMessage": "문의가 정상 접수되었습니다. 확인 후 연락드리겠습니다.",
   "subjectPrefix": "[049GAN CONTACT]",
-  "siteUrl": ""
+  "requestTimeoutMs": 15000,
+  "networkErrorMessage": "문의 전송 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  "fallbackErrorMessage": "문의 전송 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+  "siteUrl": "http://049gan.kr"
 }
 ```
+
+FormSubmit 장애가 반복되면 정적 사이트용 메일 provider로 교체할 수 있습니다. 예를 들어 Web3Forms를 사용할 때는 Web3Forms에서 발급받은 access key를 넣고 아래처럼 바꿉니다.
+
+```json
+{
+  "formProvider": "web3forms",
+  "formEndpoint": "https://api.web3forms.com/submit",
+  "accessKey": "YOUR_WEB3FORMS_ACCESS_KEY",
+  "successMessage": "문의가 정상 접수되었습니다. 확인 후 연락드리겠습니다.",
+  "subjectPrefix": "[049GAN CONTACT]",
+  "siteUrl": "http://049gan.kr"
+}
+```
+
+GitHub Pages 배포에서는 저장소 설정값으로도 덮어쓸 수 있습니다.
+
+- Repository variable `PAGES_FORM_PROVIDER`: `web3forms`
+- Repository variable `PAGES_FORM_ENDPOINT`: `https://api.web3forms.com/submit`
+- Repository secret `WEB3FORMS_ACCESS_KEY`: Web3Forms에서 발급받은 access key
+
+위 값을 설정한 뒤 `Deploy GitHub Pages` workflow를 다시 실행하면 배포 HTML에 새 전송 설정이 주입됩니다.
 
 ### Build
 
