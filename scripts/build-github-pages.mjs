@@ -35,6 +35,7 @@ const subjectPrefix =
   process.env.PAGES_FORM_SUBJECT_PREFIX ||
   pagesConfig.subjectPrefix ||
   "[049GAN CONTACT]";
+const assetVersion = process.env.GITHUB_SHA || String(Date.now());
 const formAccessKey =
   process.env.WEB3FORMS_ACCESS_KEY ||
   process.env.PAGES_FORM_ACCESS_KEY ||
@@ -214,7 +215,11 @@ function injectContactBridge(content, relativePrefix) {
     "<script>",
     "window.GITHUB_PAGES_CONTACT_FORM = " + JSON.stringify(contactFormConfig, null, 2) + ";",
     "</script>",
-    '<script src="' + relativePrefix + 'js/github-pages-contact-form.js"></script>'
+    '<script src="' +
+      relativePrefix +
+      'js/github-pages-contact-form.js?v=' +
+      encodeURIComponent(assetVersion) +
+      '"></script>'
   ].join("\n");
 
   return content.replace("</body>", configScript + "\n</body>");
